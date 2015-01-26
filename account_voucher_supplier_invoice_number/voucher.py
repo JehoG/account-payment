@@ -19,8 +19,8 @@
 #
 ##############################################################################
 
-from openerp import api, models, _
-from openerp.osv import fields, orm
+from openerp import api, fields, models, _
+from openerp.osv import orm
 
 class voucher_line(models.Model):
     _inherit = 'account.voucher.line'
@@ -28,20 +28,23 @@ class voucher_line(models.Model):
     def get_suppl_inv_num(self, cr, uid, move_line_id, context=None):
         move_line = self.pool.get('account.move.line').browse(cr, uid, move_line_id, context)
         return (move_line.invoice and move_line.invoice.supplier_invoice_number or '')
-    
-    def _get_supplier_invoice_number(self, cr, uid, ids, name, args, context=None):
+
+    @api.multi
+    @api.depends('move_line_id', 'move_line_id.invoice', 'move_line_id.invoice.supplier_invoice_number')
+    def _get_supplier_invoice_number(self):
         res={}
-        for line in self.browse(cr, uid, ids, context):
+        for line in self:
             res[line.id] = ''
             if line.move_line_id:
-                res[line.id] = self.get_suppl_inv_num(cr, uid,
-                    line.move_line_id.id, context=context)
+                res[line.id] = (line.move_line_id.invoice and line.move_line_id.invoice.supplier_invoice_number or '')
         return res
-    
-    _columns = {
-        'supplier_invoice_number': fields.function(_get_supplier_invoice_number,
-            type='char', size=64, string=_("Supplier Invoice Number")),
-        }
+
+    supplier_invoice_number = fields.Char(
+            compute='_get_supplier_invoice_number',
+            size=64, 
+            string=_("Supplier Invoice Number")
+        )
+        
 
 class voucher(models.Model):
     _inherit = 'account.voucher'
